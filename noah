@@ -1,0 +1,78 @@
+#!/bin/bash
+
+noah_cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/noah"
+[ -d $noah_cache_dir ] || mkdir -p $noah_cache_dir
+
+show_help() {
+cat << EOF
+Nothing yet.
+EOF
+}
+
+install_via_repo() {
+    sudo pacman -S "$1"
+}
+
+install_via_aur() {
+    if [ -d "$noah_cache_dir/$1" ]; then
+        while :; do
+            read -p "$1 has been installed on this machine. Reinstall? [Y/n]: " yn
+            case $yn in
+                [Yy]*|"" )
+                    rm -rf "$noah_cache_dir/$1"
+                    break;;
+                [Nn]* ) exit;;
+                * ) echo "Invalid input, try again.";;
+            esac
+        done
+    else
+        while :; do
+            read -p "Proceed with installation? [Y/n]: " yn
+            case $yn in
+                [Yy]*|"" ) break;;
+                [Nn]* ) exit;;
+                * ) echo "Invalid input, try again.";;
+            esac
+        done
+    fi
+    cd $noah_cache_dir
+    git clone https://aur.archlinux.org/"$1".git
+    cd "$1"
+    makepkg -si
+}
+
+install_pac() {
+    curl -s https://archlinux.org/packages/community/x86_64/"$1"/ | grep "Page Not Found" >/dev/null || 
+        { install_via_repo "$1"; exit 0; }
+    curl -s https://aur.archlinux.org/packages/"$1" | grep "Page Not Found" >/dev/null || 
+        { install_via_aur "$1"; exit 0; }
+
+    echo "Error: Target not found: $1" && exit 1
+}
+
+remove_pac() {
+    sudo pacman -Rns "$2"
+}
+
+# find_pac() {
+#     curl -s https://aur.archlinux.org/packages.gz | gzip -cd | sort
+# }
+
+while getopts hS:R: opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        S)  
+            install_pac $2
+            ;;
+        R)
+            remove_pac $2
+            ;;
+        *)
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
